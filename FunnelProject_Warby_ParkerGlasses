@@ -1,0 +1,68 @@
+SELECT * FROM survey
+ LIMIT 10;
+
+ /*What is the number of responses from each question?*/
+
+ SELECT question, COUNT(DISTINCT user_id) FROM survey
+ GROUP BY 1; 
+
+/*question	COUNT(DISTINCT user_id)
+1. What are you looking for?	500
+2. What's your fit?	475
+3. Which shapes do you like?	380
+4. Which colors do you like?	361
+5. When was your last eye exam?	270*/
+
+/*Corrolating data from different tables, Here shown as Quiz -> Try-On at Home -> Purchase*/
+
+SELECT DISTINCT 
+  q.user_id, 
+  h.number_of_pairs, 
+  h.user_id IS NOT NULL AS 'is_home_try_on',
+  p.user_id IS NOT NULL AS 'is_purchase' FROM quiz q
+  LEFT JOIN home_try_on h 
+  ON h.user_id = q.user_id 
+  LEFT JOIN purchase p 
+  ON p.user_id = h.user_id
+LIMIT 5;
+
+/*New table with following columns: user_id number_of_pairs,	is_home_try_on,	is_purchase*/
+
+/*Making a funneel to aggragate accross rows to get overall conversion and comparing conversion across different steps*/
+
+WITH funnel AS (
+  SELECT DISTINCT 
+  q.user_id, 
+  h.number_of_pairs, 
+  h.user_id IS NOT NULL AS 'is_home_try_on',
+  p.user_id IS NOT NULL AS 'is_purchase' FROM quiz q
+  LEFT JOIN home_try_on h 
+  ON h.user_id = q.user_id 
+  LEFT JOIN purchase p 
+  ON p.user_id = h.user_id
+)
+SELECT SUM(is_home_try_on) AS 'num_try_on', SUM(is_purchase) AS 'num_purchase', 1.0*SUM(is_home_try_on)/COUNT(user_id) AS 'quiz_to_home_try_on', 1.0*SUM(is_purchase)/SUM(is_home_try_on) AS 'home_try_on_to_purchase'
+FROM funnel; 
+
+/*Results of A/B test comparing 50% with 3 paris and 50% with 5 pairs to see who ends up purchasing more*/
+
+WITH funnel AS (
+  SELECT DISTINCT 
+  q.user_id, 
+  h.number_of_pairs, 
+  h.user_id IS NOT NULL AS 'is_home_try_on',
+  p.user_id IS NOT NULL AS 'is_purchase' FROM quiz q
+  LEFT JOIN home_try_on h 
+  ON h.user_id = q.user_id 
+  LEFT JOIN purchase p 
+  ON p.user_id = h.user_id
+)
+SELECT number_of_pairs, COUNT(*) AS 'pairs_try_on', SUM(is_home_try_on), SUM(is_purchase) 
+FROM funnel GROUP BY 1;
+
+/*number_of_pairs	pairs_try_on	SUM(is_home_try_on)	SUM(is_purchase)
+250	0	0
+3 pairs	379	379	201
+5 pairs	371	371	294
+
+More 5 pairs were purchased*/
